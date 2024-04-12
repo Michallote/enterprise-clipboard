@@ -6,3 +6,5 @@ This is a glorified clipboard
 ![image](https://github.com/Michallote/enterprise-clipboard/assets/74160122/6cead6e6-f487-4b09-9b06-0d8d38fe5d7c)
 
 ![image](https://github.com/Michallote/enterprise-clipboard/assets/74160122/060decef-4bdb-42cd-9d7f-b5721e4df272)
+
+![image](https://github.com/Michallote/enterprise-clipboard/assets/74160122/16c239b4-accd-4909-b0d5-a0545df1cf0a)
