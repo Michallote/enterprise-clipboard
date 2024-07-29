@@ -12,3 +12,50 @@ This is a glorified clipboard
 ![image](https://github.com/Michallote/enterprise-clipboard/assets/74160122/39fa8bf1-3aea-4c35-b098-238d685d15a6)
 
 ![image](https://github.com/Michallote/enterprise-clipboard/assets/74160122/985b5e61-ffd9-4740-9565-b34cc6e5fbd9)
+
+
+```
+import polars as pl
+
+def sample_groups(df: pl.DataFrame, group_col: str, n: int) -> pl.DataFrame:
+    """
+    Take `n` samples from each group in a specified categorical column of a Polars DataFrame.
+
+    Parameters:
+    df (pl.DataFrame): The input Polars DataFrame.
+    group_col (str): The column name to group by.
+    n (int): The number of samples to take from each group.
+
+    Returns:
+    pl.DataFrame: A new DataFrame with `n` samples from each group.
+    """
+    sampled_dfs = []
+    
+    # Get unique groups in the group_col
+    groups = df[group_col].unique()
+    
+    for group in groups:
+        # Filter the DataFrame by the current group
+        group_df = df.filter(pl.col(group_col) == group)
+        
+        # Sample n rows from the current group
+        sampled_group_df = group_df.sample(n, with_replacement=True)
+        
+        # Collect the sampled DataFrame
+        sampled_dfs.append(sampled_group_df)
+    
+    # Concatenate all the sampled DataFrames
+    sampled_df = pl.concat(sampled_dfs)
+    
+    return sampled_df
+
+# Example usage:
+df = pl.DataFrame({
+    "category": ["A", "A", "A", "B", "B", "B", "C", "C", "C"],
+    "value": [1, 2, 3, 4, 5, 6, 7, 8, 9]
+})
+
+# Take 2 samples from each group in the "category" column
+sampled_df = sample_groups(df, "category", 2)
+print(sampled_df)
+```
