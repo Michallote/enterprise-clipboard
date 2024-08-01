@@ -59,3 +59,36 @@ df = pl.DataFrame({
 sampled_df = sample_groups(df, "category", 2)
 print(sampled_df)
 ```
+
+```python
+import pytest
+import polars as pl
+from google.cloud import bigquery
+from unittest.mock import patch, MagicMock
+
+def test_execute_sql_file():
+    # Mocking the BigQuery client
+    with patch('google.cloud.bigquery.Client', return_value=MagicMock()) as mock_client:
+        # Mocking the read_file_contents function
+        with patch('your_module.read_file_contents', return_value="SELECT * FROM table WHERE date >= '{start_date}'") as mock_read_file:
+            # Mocking the query_polars_df function
+            with patch('your_module.query_polars_df', return_value=pl.DataFrame({"column1": [1, 2, 3]})) as mock_query:
+                from your_module import execute_sql_file
+                
+                # Call the function with the SQL file and kwargs
+                df = execute_sql_file("query.sql", start_date='2024-01-01')
+                
+                # Check if the BigQuery client was instantiated
+                mock_client.assert_called_once_with(project=PROJECT_ID)
+                
+                # Check if the SQL file was read
+                mock_read_file.assert_called_once_with("query.sql")
+                
+                # Check if the query was executed
+                mock_query.assert_called_once_with("SELECT * FROM table WHERE date >= '2024-01-01'", client=mock_client.return_value)
+                
+                # Check if the returned DataFrame is correct
+                assert df.shape == (3, 1)
+                assert df.columns == ["column1"]
+                assert df["column1"].to_list() == [1, 2, 3]
+```
