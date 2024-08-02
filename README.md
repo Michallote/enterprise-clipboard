@@ -78,3 +78,45 @@ def test_execute_sql_file():
                 assert df.columns == ["column1"]
                 assert df["column1"].to_list() == [1, 2, 3]
 ```
+
+```markdown
+Process Overview
+Calculating RFM (Recency, Frequency, Monetary value)
+
+You calculate RFM values for your customer database over a specified period.
+Using Models for Prediction
+
+You use the Beta-Geometric/Negative Binomial Distribution (BG/NBD) model to predict customer churn.
+You use the Gamma-Gamma model to predict monetary value for the next X amount of time (e.g., 3 months).
+Testing Predictions
+
+You test your model predictions by comparing them to actual values for the past 3 months.
+You obtain data for two periods:
+The actual data for the past 3 months.
+Data for the year before that (to serve as a training or reference period).
+Updating Models for Production
+
+After validation, you update your models with the latest data and deploy them for production use.
+Addressing the Concerns
+Validation Process
+
+Historical Validation: It's correct to validate your models using historical data. For example, if you're in January 2024, you could validate your models using data from January 2023 to December 2023 to predict the period from October 2023 to December 2023.
+Real-time Validation: Once validated, you update your models with the latest data for production use. However, these models are not immediately validated with real future data since that data hasn't arrived yet.
+Model Retraining and Updating
+
+It is standard practice to retrain models with the most recent data to ensure they capture the latest trends and behaviors.
+These updated models, although trained on the latest data, will only be validated once the future period has elapsed and you can compare predictions against actual data.
+Best Practices for Training and Validation
+Backtesting
+
+Perform backtesting where you use historical data to simulate predictions and compare them against actual outcomes. This helps in validating the model's performance.
+Example: Use data from January 2022 to December 2022 to predict the period from October 2022 to December 2022, then compare against actual data for those months.
+Rolling Window Validation
+
+Use a rolling window approach to continually validate your model. For example, validate the model for multiple 3-month periods in the past, not just the most recent one.
+This approach ensures the model's robustness over different periods and reduces the risk of overfitting to a particular period.
+Continuous Monitoring
+
+Once the models are in production, continuously monitor their performance and periodically validate them as new data becomes available.
+Set up a mechanism to automatically retrain and validate models at regular intervals (e.g., monthly or quarterly).
+```
