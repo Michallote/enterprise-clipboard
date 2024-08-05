@@ -2,6 +2,52 @@
 
 ```
 import pickle
+import tempfile
+import os
+
+class MyModel:
+    def __init__(self, data, model):
+        self.data = data
+        self.model = model  # This model has .save_model() and .load_model()
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Use a temporary file to save the model
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            self.model.save_model(tmp.name)
+            tmp.seek(0)
+            state['model'] = tmp.read()  # Read the binary content of the file
+        os.unlink(tmp.name)  # Clean up the temp file
+        return state
+
+    def __setstate__(self, state):
+        # Write the binary data to a temporary file and load the model from it
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(state['model'])
+            tmp.seek(0)
+            model = SomeModelClass()  # Instantiate the model class
+            model.load_model(tmp.name)
+            state['model'] = model
+        os.unlink(tmp.name)  # Clean up the temp file
+        self.__dict__.update(state)
+
+# Example usage
+data = 'some data'
+model = SomeModelClass()  # This class would have .save_model() and .load_model()
+obj = MyModel(data, model)
+
+# Pickle the object
+with open('my_object.pkl', 'wb') as f:
+    pickle.dump(obj, f)
+
+# Unpickle the object
+with open('my_object.pkl', 'rb') as f:
+    loaded_obj = pickle.load(f)
+
+```
+
+```
+import pickle
 import io
 
 class MyModel:
