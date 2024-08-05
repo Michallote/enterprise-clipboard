@@ -1,6 +1,48 @@
 # enterprise-clipboard
 
 ```
+import pickle
+import io
+
+class MyModel:
+    def __init__(self, data, model):
+        self.data = data
+        self.model = model  # Assume this attribute has .save_model() and .load_model()
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Save the model to a BytesIO stream
+        model_stream = io.BytesIO()
+        self.model.save_model(model_stream)
+        model_stream.seek(0)  # Important: move to the start of the stream after writing
+        state['model'] = model_stream.getvalue()  # Save the byte data
+        return state
+
+    def __setstate__(self, state):
+        # Load the model from the byte data
+        model_stream = io.BytesIO(state['model'])
+        model = SomeModelClass()  # Assuming you have a way to instantiate it
+        model.load_model(model_stream)
+        state['model'] = model
+        self.__dict__.update(state)
+
+# Example usage
+data = 'some data'
+model = SomeModelClass()  # This class would have .save_model() and .load_model()
+obj = MyModel(data, model)
+
+# Pickle the object
+with open('my_object.pkl', 'wb') as f:
+    pickle.dump(obj, f)
+
+# Unpickle the object
+with open('my_object.pkl', 'rb') as f:
+    loaded_obj = pickle.load(f)
+
+```
+
+
+```
 import polars as pl
 
 def sample_groups(df: pl.DataFrame, group_col: str, n: int) -> pl.DataFrame:
