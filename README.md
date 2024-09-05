@@ -227,4 +227,32 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 logger.debug(f"Print hi from crypto_labelling {__name__=}")
+
+
+class ColorFormatter(logging.Formatter):
+    # Define the color codes
+    COLORS = {
+        "DEBUG": "\033[34m",
+        "INFO": "\033[0m",  # White
+        "FINISHED": "\033[92m",  # Green
+        "WARNING": "\033[93m",  # Yellow
+        "ERROR": "\033[91m",  # Red
+        "CRITICAL": "\033[1;31m",  # Bold Red
+        "METRICS_LEVEL": "\033[36m",  # Purple,
+        "PARAMS_LEVEL": "\033[95m",
+        "ARTIFACT_LEVEL": "\033[35m",
+    }
+    RESET = "\033[0m"  # Reset code
+
+    def format(self, record):
+        levelname = record.levelname
+        message = super().format(record)
+        color = self.COLORS.get(levelname, self.RESET)
+        return f"{color}{message}{self.RESET}"
+
+formatter = ColorFormatter(
+        fmt="%(levelname)s (%(asctime)s): %(message)s (func: %(funcName)s line: %(lineno)d [%(filename)s])",
+        datefmt="%H:%M:%S",
+    )
+
 ```
