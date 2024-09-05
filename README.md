@@ -208,3 +208,23 @@ Continuous Monitoring
 Once the models are in production, continuously monitor their performance and periodically validate them as new data becomes available.
 Set up a mechanism to automatically retrain and validate models at regular intervals (e.g., monthly or quarterly).
 ```
+
+```python
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter(
+    fmt="%(levelname)s (%(asctime)s): %(message)s (func: %(funcName)s line: %(lineno)d [%(filename)s])",
+    datefmt="%H:%M:%S",
+)
+# TODO move logging files to a log folder in root
+
+# Print DEBUG level to console
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+
+logger.addHandler(stream_handler)
+
+logger.debug(f"Print hi from crypto_labelling {__name__=}")
+```
