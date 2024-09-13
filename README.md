@@ -1,5 +1,26 @@
 # enterprise-clipboard
 
+```python
+import os
+
+class FileHandler:
+    def __init__(self, file_path, content):
+        self.file_path = file_path
+        # Create the file when the object is created
+        with open(self.file_path, 'w') as f:
+            f.write(content)
+        print(f"File created: {self.file_path}")
+    
+    def __del__(self):
+        # Delete the file when the object is about to be garbage collected
+        if os.path.exists(self.file_path):
+            os.remove(self.file_path)
+            print(f"File deleted: {self.file_path}")
+
+# Example usage
+file_handler = FileHandler("example.txt", "This is some content.")
+# The file will be deleted automatically when the object is garbage collected
+```
 ```
 import pickle
 import tempfile
