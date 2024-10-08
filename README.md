@@ -277,3 +277,37 @@ formatter = ColorFormatter(
     )
 
 ```
+
+```python
+import psutil
+import time
+import threading
+import os
+import cProfile
+
+def log_resource_usage(interval=1, output_file='resource_usage.log'):
+    """Logs the CPU and memory usage every `interval` seconds."""
+    with open(output_file, 'w') as f:
+        f.write("Time\tCPU%\tMemory%\n")
+        while True:
+            cpu_usage = psutil.cpu_percent()
+            memory_usage = psutil.virtual_memory().percent
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"{timestamp}\t{cpu_usage}%\t{memory_usage}%\n")
+            f.flush()
+            time.sleep(interval)
+
+def profile_program():
+    """Runs the main program with cProfile."""
+    cProfile.run('main()', 'output.pstats')
+
+if __name__ == "__main__":
+    # Start resource usage logging in a separate thread
+    resource_thread = threading.Thread(target=log_resource_usage)
+    resource_thread.daemon = True  # Daemonize thread to exit with the program
+    resource_thread.start()
+
+    # Profile the main program
+    profile_program()
+
+```
