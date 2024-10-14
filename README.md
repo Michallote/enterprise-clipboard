@@ -374,3 +374,19 @@ if __name__ == "__main__":
         f"Finalized execution to visualize results in interactive window run:\nuvx snakeviz {args.profiler_file}"
     )
 ```
+
+```python
+# Target for building the Docker image
+.PHONY: build
+build:
+    @echo "Fetching environment variables from Python script..."
+    IMAGE_NAME=$$(python3 -c 'from env_vars import IMAGE_NAME; print(IMAGE_NAME)') \
+    ENV_VALUE=$$(python3 -c 'from env_vars import ENV_VALUE; print(ENV_VALUE)') \
+    DOCKER_BUILDKIT=1 docker build --no-cache --progress=plain -t $$IMAGE_NAME . -f Dockerfile --build-arg VAR_!=$$ENV_VALUE
+
+# Target for cleaning up
+.PHONY: clean
+clean:
+    @echo "Cleaning Docker build artifacts..."
+    docker system prune -f
+```
