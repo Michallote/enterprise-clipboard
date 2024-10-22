@@ -392,5 +392,628 @@ clean:
 ```
 
 ```python
-print("Hello World")
+import atexit
+import json
+import logging
+import os
+import pickle
+from posixpath import splitext
+from typing import Any, Callable, Optional
+
+import mlflow
+import mlflow.tracking.client
+import pandas as pd
+import plotly.graph_objects as go
+import yaml
+from mlflow.entities.experiment import Experiment
+from mlflow.entities.model_registry.model_version import ModelVersion
+from mlflow.entities.run import Run
+from mlflow.models.model import ModelInfo
+from mlflow.pyfunc import PythonModel
+from mlflow.tracking.client import MlflowClient
+
+from consts import EXPERIMENT_TAGS
+from src.utils.search_file import search_file
+
+logger = logging.getLogger("models")
+
+
+LOAD_FUNCTIONS = {
+    "catboost": mlflow.catboost.load_model,
+    "fastai": mlflow.fastai.load_model,
+    "gluon": mlflow.gluon.load_model,
+    "h2o": mlflow.h2o.load_model,
+    "keras": mlflow.keras.load_model,
+    "lightgbm": mlflow.lightgbm.load_model,
+    "onnx": mlflow.onnx.load_model,
+    "pyfunc": mlflow.pyfunc.load_model,
+    "pytorch": mlflow.pytorch.load_model,
+    "sklearn": mlflow.sklearn.load_model,
+    "spacy": mlflow.spacy.load_model,
+    "spark": mlflow.spark.load_model,
+    "statsmodels": mlflow.statsmodels.load_model,
+    "tensorflow": mlflow.tensorflow.load_model,
+    "xgboost": mlflow.xgboost.load_model,
+    "paddle": mlflow.paddle.load_model,
+    "prophet": mlflow.prophet.load_model,
+    "pmdarima": mlflow.pmdarima.load_model,
+}
+
+LOG_FUNCTIONS = {
+    "catboost": mlflow.catboost.log_model,
+    "fastai": mlflow.fastai.log_model,
+    "gluon": mlflow.gluon.log_model,
+    "h2o": mlflow.h2o.log_model,
+    "keras": mlflow.keras.log_model,
+    "lightgbm": mlflow.lightgbm.log_model,
+    "onnx": mlflow.onnx.log_model,
+    "pyfunc": mlflow.pyfunc.log_model,
+    "pytorch": mlflow.pytorch.log_model,
+    "sklearn": mlflow.sklearn.log_model,
+    "spacy": mlflow.spacy.log_model,
+    "spark": mlflow.spark.log_model,
+    "statsmodels": mlflow.statsmodels.log_model,
+    "tensorflow": mlflow.tensorflow.log_model,
+    "xgboost": mlflow.xgboost.log_model,
+    "paddle": mlflow.paddle.log_model,
+    "prophet": mlflow.prophet.log_model,
+    "pmdarima": mlflow.pmdarima.log_model,
+}
+
+
+@search_file
+def save_pickle(
+    model: Any,
+    local_model_path: str,
+):
+    with open(local_model_path, "wb") as f:
+        pickle.dump(model, f)
+
+
+class InvalidModelName(Exception):
+    """Invalid Model Name Exception"""
+
+
+class ModelFlavorNotSupported(Exception):
+    """MlFlow Model Flavor Not Supported"""
+
+
+class MlFlowLogger:
+    """
+    A class used to interact with MLflow's tracking and model registry components.
+    """
+
+    load_functions: dict[str, Callable] = LOAD_FUNCTIONS
+    log_functions: dict[str, Callable] = LOG_FUNCTIONS
+
+    def __init__(self):
+        mlflow.set_tracking_uri()
+        self.client = MlflowClient()  # Initialize client
+
+    def start_run(self, experiment_name: str, run_name: str | None = None):
+        experiment = self.get_or_create_experiment(experiment_name)
+        experiment_id = experiment.experiment_id
+        self.run = mlflow.start_run(experiment_id=experiment_id, run_name=run_name)
+        self.run_id = self.run.info.run_uuid
+        logger.info(f"Starting mlflow run with run_id={self.run_id}")
+        atexit.register(self.end_run)
+        return self.run_id
+
+    def end_run(self):
+        mlflow.end_run()
+
+    def get_experiment_id(self, experiment_name: str) -> str:
+        """
+        Retrieves the ID of an experiment given its name.
+
+        Parameters
+        ----------
+        experiment_name : str
+            The name of the experiment.
+
+        Returns
+        -------
+        str
+            The ID of the experiment.
+        """
+        retrieved_exp_id = self.get_experiment(experiment_name)
+
+        return retrieved_exp_id.experiment_id
+
+    def get_experiment(self, experiment_name: str) -> Experiment:
+        """
+        Retrieves an experiment given its name.
+
+        Parameters
+        ----------
+        experiment_name : str
+            The name of the experiment.
+
+        Returns
+        -------
+        Experiment
+            The retrieved experiment.
+        """
+
+        client = self.client
+        return client.get_experiment_by_name(experiment_name)
+
+    def get_experiment_runs(self, experiment_name: str) -> list[Run]:
+        """
+        Retrieves all runs of an experiment given its name.
+
+        Parameters
+        ----------
+        experiment_name : str
+            The name of the experiment.
+
+        Returns
+        -------
+        list[Run]
+            A list of all runs of the experiment.
+        """
+
+        client = self.client
+        retrieved_exp_id = self.get_experiment_id(experiment_name)
+        runs = client.search_runs(retrieved_exp_id)
+        return runs
+
+    def get_latest_run(self, experiment_name: str) -> Run:
+        """
+        Retrieves the latest run of an experiment given its name.
+
+        Parameters
+        ----------
+        experiment_name : str
+            The name of the experiment.
+
+        Returns
+        -------
+        Run
+            The latest run of the experiment.
+        """
+
+        retrieved_exp_id = self.get_experiment_id(experiment_name)
+
+        latest_run = self.client.search_runs(
+            retrieved_exp_id, order_by=["attribute.start_time DESC"], max_results=1
+        )
+
+        return latest_run[0]
+
+    def register_latest_model(
+        self,
+        experiment_name: str,
+        model_registry_name: str,
+        mlflow_pyfunc_model_path: Optional[str] = None,
+    ):
+        """
+        Registers the latest model of an experiment.
+
+        Parameters
+        ----------
+        experiment_name : str
+            The name of the experiment.
+        model_registry_name : str
+            The name to register the model under in the model registry.
+        mlflow_pyfunc_model_path : str
+            The path to the model in the MLflow format.
+
+        Returns
+        -------
+        ModelVersion
+            The registered model version.
+        """
+
+        latest_run = self.get_latest_run(experiment_name)
+        run_id = latest_run.info.run_id
+
+        if mlflow_pyfunc_model_path is None:
+            run_data = latest_run.data.tags
+            [contents] = json.loads(run_data["mlflow.log-model.history"])
+            mlflow_pyfunc_model_path = contents["artifact_path"]
+
+        model_version = mlflow.register_model(
+            f"runs:/{run_id}/{mlflow_pyfunc_model_path}", model_registry_name
+        )
+        return model_version
+
+    def get_latest_model(
+        self, model_registry_name: str, stages: str | list[str] | None = None
+    ) -> ModelVersion:
+        """
+        Retrieves the latest model from the model registry.
+
+        Parameters
+        ----------
+        model_registry_name : str
+            The name of the model in the model registry.
+        stages : str | list[str] | None, optional
+            The stages to consider when retrieving the latest model, by default None.
+
+        Returns
+        -------
+        ModelVersion
+            The latest model version.
+        """
+
+        if stages is None:
+            stages = ["Staging", "Production"]  # ['None']
+        elif isinstance(stages, str):
+            stages = [stages]
+
+        latest_models = self.client.get_latest_versions(
+            model_registry_name, stages=stages
+        )
+
+        latest_models = list(
+            filter(lambda model: model.name == model_registry_name, latest_models)
+        )
+
+        if len(latest_models) == 0:
+            raise Exception(
+                f"No model found matching the description. {model_registry_name=}"
+            )
+
+        return max(latest_models, key=lambda x: int(x.version))
+
+    def create_new_experiment(
+        self,
+        experiment_name: str,
+        experiment_description: str,
+        experiment_tags: dict[str, str],
+    ) -> str:
+        """Create an experiment.
+
+        Parameters
+        ----------
+        experiment_name : str
+            The experiment name. Must be unique.
+        experiment_description : str
+            The experiment description to be displayed in the ui tab
+        experiment_tags : dict[str, str]
+            A dictionary of key-value pairs that are converted into
+                                :py:class:`mlflow.entities.ExperimentTag` objects, set as
+                                experiment tags upon experiment creation.
+
+        Returns
+        -------
+        str
+            String as an integer ID of the created experiment.
+
+        Examples
+        --------
+
+        .. code-block:: python
+            :caption: Example
+
+            # Create a new experiment, will fail if it already exists.
+
+            experiment_name = "cltv-lifetime-models-nested-runs"
+
+            experiment_description = (
+                "Project SAMS-CLTV Segmentation and Lifetime Model predictions."
+                "This project segments the memberships into customer segments and associate_types"
+            )
+
+            # Provide searchable tags that define characteristics of the Runs that will be in this Experiment
+            experiment_tags = {
+                "project_name": "cltv-rfm-lifetime-models",
+                "store": "SAMS",
+                "model_groups": "associate_types",
+                "team": "wmt-mx-dl-iaml",
+                "project_quarter": "Q3-2023",
+                "mlflow.note.content": experiment_description,
+            }
+        """
+
+        retrieved_experiment = self.get_experiment(experiment_name)
+
+        if retrieved_experiment is not None:
+            logger.warning(
+                f"Experiment '{experiment_name}' already exists: {retrieved_experiment}"
+            )
+            return retrieved_experiment.experiment_id
+
+        experiment_tags["mlflow.note.content"] = experiment_description
+
+        cltv_experiment = self.client.create_experiment(
+            name=experiment_name, tags=experiment_tags
+        )
+
+        return cltv_experiment
+
+    def get_or_create_experiment(
+        self, experiment_name: str, tags: Optional[dict] = None
+    ) -> Experiment:
+        """
+        Retrieves an experiment if it exists, otherwise creates a new one.
+
+        Parameters
+        ----------
+        experiment_name : str
+            The name of the experiment.
+
+        Returns
+        -------
+        Experiment
+            The retrieved or created experiment.
+        """
+
+        retrieved_experiment = self.get_experiment(experiment_name)
+
+        if retrieved_experiment is not None:
+            return retrieved_experiment
+
+        logger.warning(
+            f"'{experiment_name}' not found. Creating new experiment. No metadata was provided. Using defaults."
+        )
+
+        if tags is None:
+            tags = EXPERIMENT_TAGS
+
+        self.client.create_experiment(name=experiment_name, tags=tags)
+
+        return self.get_experiment(experiment_name)
+
+    def log_model(
+        self, model: Any, artifact_path: str, flavor: str, **kwargs
+    ) -> ModelInfo:
+
+        if flavor not in self.log_functions:
+            raise ModelFlavorNotSupported(f"Model flavour {flavor} is not valid.")
+
+        model_info = self.log_functions[flavor](model, artifact_path, **kwargs)
+        return model_info
+
+    def log_pyfunc_model(
+        self,
+        model: Any,
+        local_model_path: str,
+        mlflow_pyfunc_model_path: str,
+        python_model: PythonModel = PythonModel,
+        code_path: list[str] | tuple[str, ...] = ("./src", "./config", "consts.py"),
+        **kwargs,
+    ):
+        if "signature" in kwargs:
+            signature = kwargs.pop("signature")
+        else:
+            signature = getattr(python_model, "signature")
+
+        code_path = list(code_path)
+        local_model_path = self._assert_local_model_store(
+            model, local_model_path, mlflow_pyfunc_model_path
+        )
+        artifacts = {"model_path": local_model_path}
+        model_info = mlflow.pyfunc.log_model(
+            artifact_path=mlflow_pyfunc_model_path,
+            python_model=python_model(),
+            code_path=code_path,
+            artifacts=artifacts,
+            signature=signature,
+            **kwargs,
+        )
+
+        return model_info
+
+    def _assert_local_model_store(
+        self, model: Any, local_model_path: str, mlflow_pyfunc_model_path: Optional[str]
+    ):
+        """
+        Asserts that the local model stored is valid.
+
+        Parameters
+        ----------
+        model : Any
+            The model to check.
+        local_model_path : str
+            The local path to the model.
+        mlflow_pyfunc_model_path : Optional[str]
+            The path to the model in the MLflow format.
+
+        Returns
+        -------
+        str
+            The validated local model path.
+        """
+
+        assert not isinstance(model, str)
+
+        # determine if local_model_path is a directory and that the filename can be constructed
+        if not local_model_path.endswith(".pkl"):
+            if isinstance(mlflow_pyfunc_model_path, str):
+                local_model_path = f"{local_model_path}/{mlflow_pyfunc_model_path}.pkl"
+            else:
+                logger.error(
+                    "When passing local_model_path as a directory, "
+                    "mlflow_pyfunc_model_path must be provided too."
+                )
+                raise InvalidModelName(
+                    f"Could not reconstruct the model name from {local_model_path=} & {mlflow_pyfunc_model_path=}"
+                )
+
+        # Handle cases when model is not provided, it must be saved already in memory
+        if model is None:
+            if os.path.isfile(local_model_path) and local_model_path.endswith(".pkl"):
+                return local_model_path
+
+            logger.error(
+                "If model argument is not provided it must be already saved to memory."
+            )
+            raise FileNotFoundError(f"Model not found in '{local_model_path}'")
+
+        save_pickle(model=model, local_model_path=local_model_path)
+
+        logger.info(f"Model saved to {local_model_path}. ({model=})")
+
+        return local_model_path
+
+    def register_model(
+        self, run_id: str, mlflow_pyfunc_model_path: str, model_registry_name: str
+    ):
+        """
+        Registers a model to the model registry.
+
+        Parameters
+        ----------
+        run_id : str
+            The ID of the run.
+        mlflow_pyfunc_model_path : str
+            The path to the model in the MLflow format.
+        model_registry_name : str
+            The name to register the model under in the model registry.
+
+        Returns
+        -------
+        ModelVersion
+            The registered model version.
+        """
+
+        model_version = mlflow.register_model(
+            f"runs:/{run_id}/{mlflow_pyfunc_model_path}", model_registry_name
+        )
+
+        return model_version
+
+    def log_metrics(self, metrics: dict[str, float], step: int | None = None):
+        mlflow.log_metrics(metrics, step=step)
+
+    def log_params(self, params: dict[str, Any]):
+        mlflow.log_params(params)
+
+    def set_tags(self, tags: dict[str, Any]):
+        mlflow.set_tags(tags)
+
+    def register_model_to_stage(
+        self,
+        run_id: str,
+        model_registry_name: str,
+        mlflow_pyfunc_model_path: str,
+        stage: None | str = None,
+    ):
+        """
+        Registers a model to the MLflow Model Registry and optionally sets its stage.
+
+        Parameters
+        ----------
+        run_id : str
+            The ID of the run that produced the model.
+        model_registry_name : str
+            The name to register the model under in the model registry.
+        mlflow_pyfunc_model_path : str
+            The path to the model in the MLflow format.
+        stage : str, optional
+            The stage to set for the model in the model registry. If this is `None`, the function will not set a stage for the model.
+
+        Returns
+        -------
+        mlflow.entities.model_registry.ModelVersion
+            The registered model version.
+
+        Raises
+        ------
+        MlflowException
+            If an error occurs while registering the model or transitioning its stage.
+        """
+
+        model_version = self.register_model(
+            run_id, mlflow_pyfunc_model_path, model_registry_name
+        )
+        if stage is not None:
+            model_version = self.promote_model_to_stage(
+                model_version.name,
+                model_version.version,
+                stage=stage,
+            )
+        return model_version
+
+    def promote_model_to_stage(self, model_name: str, model_version: str, stage: str):
+
+        archive_existing_versions = stage in ["Production", "Staging"]
+        model_version = self.client.transition_model_version_stage(
+            model_name,
+            model_version,
+            stage=stage,
+            archive_existing_versions=archive_existing_versions,
+        )
+        return model_version
+
+    def load_latest_model(
+        self, model_registry_name: str, model_flavour: str = "pyfunc"
+    ) -> mlflow.pyfunc.PyFuncModel:
+
+        latest_model = self.get_latest_model(model_registry_name)
+
+        loaded_model = self.load_functions[model_flavour](
+            f"models:/{latest_model.name}/{latest_model.version}"
+        )
+
+        return loaded_model
+
+    def load_model_version(self, model_registry_name: str, model_version: str):
+
+        model_info = self.client.get_model_version(model_registry_name, model_version)
+
+        loaded_model = mlflow.pyfunc.load_model(
+            f"models:/{model_info.name}/{model_info.version}"
+        )
+
+        return loaded_model
+
+    def load_model_from_run(self, run_id: str) -> mlflow.pyfunc.PyFuncModel:
+
+        run_obj = self.client.get_run(run_id)
+
+        tags = run_obj.data.tags
+
+        [model_history] = json.loads(tags["mlflow.log-model.history"])
+        artifact_path = model_history["artifact_path"]
+        logged_model = f"runs:/{run_id}/{artifact_path}"
+
+        # Load model as a PyFuncModel.
+        loaded_model = mlflow.pyfunc.load_model(logged_model)
+
+        return loaded_model
+
+    def log_table(self, df: pd.DataFrame, table_name: str):
+
+        fig = go.Figure(
+            data=[
+                go.Table(
+                    header=dict(
+                        values=list(df.columns),
+                        fill_color="paleturquoise",
+                        align="left",
+                    ),
+                    cells=dict(
+                        values=[df[col] for col in df],
+                        fill_color="lavender",
+                        align="left",
+                    ),
+                )
+            ]
+        )
+
+        if not table_name.endswith(".html"):
+            root, ext = splitext(table_name)
+            table_name = f"{root}.html"
+
+        mlflow.log_figure(fig, table_name)
+
+    def log_parquet(self, df: pd.DataFrame, local_path: str, artifact_path: str):
+
+        df.to_parquet(local_path, index=False)
+        mlflow.log_artifact(local_path, artifact_path)
+
+    def log_yaml(self, data: Any, local_path: str, artifact_path: str):
+
+        with open(local_path, "w", encoding="utf-8") as file:
+            yaml.dump(data, file, default_flow_style=False)
+
+        mlflow.log_artifact(local_path, artifact_path)
+
+
+if __name__ == "__main__":
+    pass
+
 ```
