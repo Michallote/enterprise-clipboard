@@ -390,3 +390,7 @@ clean:
     @echo "Cleaning Docker build artifacts..."
     docker system prune -f
 ```
+
+```python
+print("Hello World")
+```
