@@ -364,3 +364,259 @@ if __name__ == "__main__":
     pass
 
 ```
+
+
+```python
+def make_input(params: Iterable) -> list[str]:
+    """Generates a list of input parameter declarations for Kubeflow Pipelines (KFP) components.
+
+    Parameters
+    ----------
+    - params : Iterable
+        A list of parameter names.
+
+    Returns
+    -------
+    list[str]
+        A list of formatted strings for input parameters, in the format 'param: Input[Dataset]'.
+    """
+    return list(map(lambda x: f"{x}: Input[Dataset]", params))
+
+
+def make_output(params: Iterable) -> list[str]:
+    """Generates a list of output parameter declarations for KFP components.
+
+    Parameters
+    ----------
+    - params : Iterable
+        A list of parameter names.
+
+    Returns
+    -------
+    list[str]
+        A list of formatted strings for output parameters, in the format 'param: Output[Dataset]'.
+    """
+    return list(map(lambda x: f"{x}: Output[Dataset]", params))
+
+
+def create_import_statement(function: Callable) -> str:
+    """Creates an import statement for a given function.
+
+    Parameters
+    ----------
+    - function : Callable
+        The function to generate an import statement for.
+
+    Returns
+    -------
+    str
+        Import statement for the specified function.
+    """
+    return f"from {function.__module__} import {function.__name__}"
+
+
+def create_function_code(
+    func_name: str,
+    params: list[str],
+    body: str,
+    imports: list[str],
+    decorator: Optional[str] = None,
+) -> str:
+    """Generates the code for a function, including its imports, parameters, and body.
+
+    Parameters
+    ----------
+    - func_name : str
+        The name of the function to generate.
+    - params : list[str]
+        A list of function parameter names.
+    - body : str
+        The code to include in the function body.
+    - imports : list[str]
+        A list of imports to include in the function.
+    - decorator : Optional[str], optional
+        An optional decorator to apply to the function.
+
+    Returns
+    -------
+    str
+        The full code for the function as a formatted string.
+    """
+    ...
+
+
+def create_function_call(
+    function_name: str, args: list[str], kwargs: dict[str, Any], outputs: list[str]
+) -> str:
+    """Creates a function call statement with specified arguments and keyword arguments.
+
+    Parameters
+    ----------
+    - function_name : str
+        The name of the function to call.
+    - args : list[str]
+        A list of positional arguments for the function.
+    - kwargs : dict[str, Any]
+        A dictionary of keyword arguments for the function.
+    - outputs : list[str]
+        A list of output variables for capturing function return values.
+
+    Returns
+    -------
+    str
+        The formatted function call as a string.
+    """
+    ...
+
+
+def create_function_from_step(
+    component_name: str,
+    function: Callable,
+    inputs: Optional[list[str]] = None,
+    outputs: Optional[list[str]] = None,
+    kwargs: Optional[dict] = None,
+    decorator: Optional[str] = None,
+    load_fn: Optional[Callable] = None,
+    store_fn: Optional[Callable] = None,
+) -> tuple[str, dict]:
+    """Creates the code for a component function from a pipeline step, including inputs and outputs handling.
+
+    Parameters
+    ----------
+    - component_name : str
+        The name of the component function.
+    - function : Callable
+        The function to wrap as a component.
+    - inputs : Optional[list[str]], optional
+        List of input parameters.
+    - outputs : Optional[list[str]], optional
+        List of output parameters.
+    - kwargs : Optional[dict], optional
+        Dictionary of keyword arguments.
+    - decorator : Optional[str], optional
+        Optional decorator for the component.
+    - load_fn : Optional[Callable], optional
+        Function to load input datasets.
+    - store_fn : Optional[Callable], optional
+        Function to store output datasets.
+
+    Returns
+    -------
+    tuple[str, dict]
+        A tuple containing the component code as a string and a dictionary of pipeline metadata.
+    """
+    ...
+
+
+def parse_names_safe(name: str):
+    """Safely parses a string to create a valid identifier by removing specific characters.
+
+    Parameters
+    ----------
+    - name : str
+        The string to parse.
+
+    Returns
+    -------
+    str
+        A formatted string safe for use as a variable name.
+    """
+    ...
+
+
+def kfp_from_pipeline(
+    pipeline_steps: list[dict],
+    load_function: Callable,
+    store_function: Callable,
+    pipeline_name: str,
+    pipeline_root: str,
+    pipeline_json: str,
+) -> str:
+    """Generates the Kubeflow Pipeline (KFP) code for a sequence of pipeline steps.
+
+    Parameters
+    ----------
+    - pipeline_steps : list[dict]
+        List of dictionaries describing each step in the pipeline.
+    - load_function : Callable
+        Function to load data for each step.
+    - store_function : Callable
+        Function to store data from each step.
+    - pipeline_name : str
+        Name of the pipeline.
+    - pipeline_root : str
+        Root path for pipeline artifacts.
+    - pipeline_json : str
+        Path to save the compiled pipeline JSON.
+
+    Returns
+    -------
+    str
+        Full generated pipeline code as a string.
+    """
+    ...
+
+
+def create_components_code(
+    pipeline_steps: list[dict], load_function: Callable, store_function: Callable
+) -> tuple[str, list[dict]]:
+    """Creates the code for each component in the pipeline.
+
+    Parameters
+    ----------
+    - pipeline_steps : list[dict]
+        A list of steps, where each step is a dictionary with function details.
+    - load_function : Callable
+        Function to load input data.
+    - store_function : Callable
+        Function to save output data.
+
+    Returns
+    -------
+    tuple[str, list[dict]]
+        A tuple containing the component code as a string and a list of parameters for the compiler.
+    """
+    ...
+
+
+def create_compile_function(compiler_info: list[dict]) -> str:
+    """Generates the compilation function for the pipeline with specified compiler information.
+
+    Parameters
+    ----------
+    - compiler_info : list[dict]
+        A list of dictionaries with information for each pipeline component.
+
+    Returns
+    -------
+    str
+        The generated compilation function code.
+    """
+    ...
+
+
+def create_kfp_compiler_file(
+    training_steps: list[dict],
+    file: str,
+    pipeline_name: str,
+    pipeline_root: str,
+    pipeline_json: str,
+):
+    """Creates a file that compiles the Kubeflow Pipeline (KFP) with the given training steps.
+
+    Parameters
+    ----------
+    - training_steps : list[dict]
+        List of dictionaries specifying each step in the training pipeline.
+    - file : str
+        Path to the output file to save the compiled pipeline code.
+    - pipeline_name : str
+        Name of the pipeline.
+    - pipeline_root : str
+        Root path for pipeline artifacts.
+    - pipeline_json : str
+        Path to save the compiled pipeline JSON.
+    """
+    ...
+
+```
