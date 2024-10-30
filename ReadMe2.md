@@ -21,8 +21,8 @@ PIPELINE_ROOT = "{pipeline_root}"
 PIPELINE_NAME = "{pipeline_name}"
 
 REGION = "us-east4"
-VPC_NETWORK = "projects/12856960411/global/networks/vpcnet-private-svc-access-use4"
-SERVICE_ACCOUNT = "svc-mx-dl-iaml-ds-hs@wmt-mx-dl-iaml-dev.iam.gserviceaccount.com"
+VPC_NETWORK = "vpcnet-private-svc-access-use4"
+SERVICE_ACCOUNT = "svc@gcp-project.iam.gserviceaccount.com"
 """
 
 MAIN_BLOCK = """
