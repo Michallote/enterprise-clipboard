@@ -1,6 +1,51 @@
 # enterprise-clipboard
 
 ```python
+# List of MLflow model flavors
+FLAVORS = [
+    "catboost",
+    "fastai",
+    "gluon",
+    "h2o",
+    "keras",
+    "lightgbm",
+    "onnx",
+    "pyfunc",
+    "pytorch",
+    "sklearn",
+    "spacy",
+    "spark",
+    "statsmodels",
+    "tensorflow",
+    "xgboost",
+    "paddle",
+    "prophet",
+    "pmdarima",
+]
+
+
+# Helper function to create a lazy-loadable function
+def make_lazy_function(flavor, func_name):
+    def lazy_func(*args, **kwargs):
+        # Import the module dynamically
+        module = importlib.import_module(f"mlflow.{flavor}")
+        # Get the function from the module
+        func = getattr(module, func_name)
+        # Call the function with the provided arguments
+        return func(*args, **kwargs)
+
+    return lazy_func
+
+
+# Create dictionaries with lazy-loadable functions
+LOAD_FUNCTIONS = {
+    flavor: make_lazy_function(flavor, "load_model") for flavor in FLAVORS
+}
+
+LOG_FUNCTIONS = {flavor: make_lazy_function(flavor, "log_model") for flavor in FLAVORS}
+```
+
+```python
 import os
 
 class FileHandler:
