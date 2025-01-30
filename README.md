@@ -1,6 +1,89 @@
 # enterprise-clipboard
 
 ```python
+import argparse
+import importlib
+import inspect
+import json
+
+
+def import_function(func_path):
+    """
+    Import a function dynamically from a module.
+    :param func_path: str, in the format "module:function"
+    :return: function object
+    """
+    try:
+        module_name, function_name = func_path.split(":")
+        module = importlib.import_module(module_name)
+        func = getattr(module, function_name)
+        return func
+    except (ValueError, ModuleNotFoundError, AttributeError) as e:
+        raise ImportError(f"Could not load function '{func_path}': {e}")
+
+
+def parse_function_args(func, cli_args):
+    """
+    Map CLI arguments to function arguments dynamically.
+    :param func: function object
+    :param cli_args: dict of CLI arguments
+    :return: dict of valid function arguments
+    """
+    sig = inspect.signature(func)
+    parsed_args = {}
+
+    for param in sig.parameters.values():
+        name = param.name
+        if name in cli_args:
+            arg_value = cli_args[name]
+            if param.annotation in [int, float, bool] and arg_value is not None:
+                # Convert to the correct type
+                parsed_args[name] = param.annotation(arg_value)
+            else:
+                parsed_args[name] = arg_value
+
+    return parsed_args
+
+
+def cli():
+    parser = argparse.ArgumentParser(description="Dynamically call a function and process its result.")
+    
+    parser.add_argument(
+        "function",
+        type=str,
+        help="Function to call in the format 'module:function'"
+    )
+    
+    parser.add_argument(
+        "--args",
+        type=str,
+        help="JSON formatted string with function arguments (optional). Example: '{\"name\": \"me\", \"generate_email\": false}'"
+    )
+    
+    args = parser.parse_args()
+
+    # Import and call the function
+    func = import_function(args.function)
+
+    # Parse JSON arguments if provided
+    func_args = json.loads(args.args) if args.args else {}
+
+    # Validate and execute function
+    valid_args = parse_function_args(func, func_args)
+    result = func(**valid_args)
+
+    # Print or pass to another function
+    print(f"Function Output: {result}")
+    return result
+
+
+if __name__ == "__main__":
+    cli()
+
+```
+
+
+```python
 # List of MLflow model flavors
 FLAVORS = [
     "catboost",
