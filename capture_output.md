@@ -525,3 +525,87 @@ def test_unsupported_type():
         capture(get_set, declared_type=set)
 
 ```
+
+# Issue Add tracked value system (Bound objects) to support deferred pipeline parameters
+
+```markdown
+### Summary
+
+Introduce a `Bound` object system to support deferred/lazy evaluation of pipeline parameters. This allows pipeline inputs (e.g., `start_date`) to retain knowledge of how they were generated (function + parameters), enabling transparent execution in both local and compiled modes (e.g., Kubeflow Pipelines).
+
+### Motivation
+
+In current pipelines, early evaluation of inputs (e.g., `start_date = datetime.now().strftime(...)`) loses information about how the value was generated. When compiling the pipeline (e.g., to Kubeflow), it's no longer possible to rehydrate or recompile the original function call.
+
+We need a system that:
+- Retains original function + arguments,
+- Behaves **identically** to native Python types (`str`, `float`, etc.),
+- Supports f-strings, serialization, and general usage without surprises,
+- Is type-safe and transparent to users.
+
+### Proposed Feature
+
+Introduce `Bound<T>` objects (e.g., `BoundStr`, `BoundInt`, `BoundDict`, etc.) that:
+- Are drop-in replacements for base Python types,
+- Store creation metadata (`creation_func`, `params`),
+- Provide `function_definition()` to reconstruct origin call,
+- Are created using a `capture(...)` factory function.
+
+### Affected Areas
+
+- Pipeline construction logic
+- Future pipeline compiler integrations (e.g., `to_kfp`)
+
+### Related Features
+
+- `execute_pipeline(...)`
+- `compile_pipeline(...)`
+
+### Tasks
+
+- [x] Define `BoundBase` and tracked subclasses
+- [x] Create `capture()` factory
+- [x] Add type validation and dispatching
+- [x] Build test suite ensuring behavioral transparency
+- [ ] Add documentation/examples
+
+```
+
+PR: feat: Add Bound objects for deferred pipeline parameters
+
+```markdown
+### Summary
+
+This PR introduces a new system of `Bound` objects to track how pipeline inputs were generated, while behaving like standard Python primitives. This supports deferred evaluation of parameters and future compiler output (e.g., generating code for Kubeflow Pipelines).
+
+### Highlights
+
+- `BoundBase` class stores `creation_func` and `params`
+- Tracked subclasses:
+  - `BoundStr`
+  - `BoundFloat`
+  - `BoundInt`
+  - `BoundList`
+  - `BoundTuple`
+  - `BoundDict`
+- `capture()` function: wraps a value in its tracked type
+- Strict type checking to ensure declared type matches function output
+- Booleans intentionally excluded due to Python identity constraints (`is True` fails)
+- Full `pytest` test suite to ensure:
+  - `isinstance` matches original types
+  - `==` behaves as expected
+  - f-strings, json, copy, unpacking, and function arg compatibility all pass
+
+### Example Usage
+
+```python
+def get_current_date() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+start_date = capture(get_current_date, declared_type=str)
+
+pipeline_steps = [
+    {"name": "raw", "func": execute_query, "kwargs": {"start_date": start_date}}
+]
+
+```
