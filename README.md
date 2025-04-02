@@ -1,6 +1,80 @@
 # enterprise-clipboard
 
 ```python
+class BoundExpression:
+    def __init__(self, expr: str, value: Any):
+        self._expr = expr  # string representing the python expression
+        self._value = value  # actual evaluated value
+
+    def function_definition(self) -> str:
+        return self._expr
+
+    def __repr__(self) -> str:
+        return f"<BoundExpression expr={self._expr!r} value={self._value!r}>"
+
+    def __str__(self):
+        return str(self._value)
+
+    # Overriding all dunder methods:
+    def __getattr__(self, attr):
+        orig_attr = getattr(self._value, attr)
+        if callable(orig_attr):
+            def method_proxy(*args, **kwargs):
+                args_repr = ", ".join(
+                    [arg.function_definition() if isinstance(arg, BoundExpression) else repr(arg)
+                     for arg in args]
+                )
+                kwargs_repr = ", ".join(
+                    [f"{k}={v.function_definition() if isinstance(v, BoundExpression) else repr(v)}"
+                     for k, v in kwargs.items()]
+                )
+                all_args = ", ".join(filter(None, [args_repr, kwargs_repr]))
+                new_expr = f"{self._expr}.{attr}({all_args})"
+                new_value = orig_attr(*args, **kwargs)
+                return BoundExpression(new_expr, new_value)
+            return method_proxy
+        else:
+            new_expr = f"{self._expr}.{attr}"
+            return BoundExpression(new_expr, orig_attr)
+
+    def __add__(self, other):
+        other_expr = other.function_definition() if isinstance(other, BoundExpression) else repr(other)
+        new_expr = f"({self._expr} + {other_expr})"
+        new_value = self._value + (other._value if isinstance(other, BoundExpression) else other)
+        return BoundExpression(new_expr, new_value)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    # Implement more operators as necessary
+
+def capture(
+    creation_func: Callable[..., T],
+    params: Optional[Dict[str, Any]] = None,
+) -> BoundExpression:
+    params = params or {}
+    value = creation_func(**params)
+    params_repr = ", ".join(f"{k}={repr(v)}" for k, v in params.items())
+    expr = f"{creation_func.__name__}({params_repr})"
+    return BoundExpression(expr, value)
+
+
+from datetime import datetime, timedelta
+
+start_date = capture(datetime.now)
+end_date = start_date + timedelta(days=30)
+formatted_start = start_date.strftime("%Y-%m-%d")
+formatted_end = end_date.strftime("%Y-%m-%d")
+
+print(formatted_start.function_definition())
+# Output: datetime.now().strftime("%Y-%m-%d")
+
+print(formatted_end.function_definition())
+# Output: (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+```
+
+
+```python
 import argparse
 import importlib
 import inspect
