@@ -1,3 +1,107 @@
+
+
+```markdown
+Here’s a compact “developer-style” prompt you can paste into ChatGPT when you’re ready to start generating plotting code in a notebook.
+
+You can tweak names (like `df_agg`) if your actual variable names differ.
+
+---
+
+### 📋 Visualization Prompt (for you to paste into ChatGPT)
+
+> You are helping me explore demand data and decide whether I need **separate models per product–store** or if I can aggregate across stores.
+>
+> **Context**
+>
+> * I work in Python in a **Jupyter notebook**.
+> * I use **polars** for data (`import polars as pl`), and I have a large raw LazyFrame of ~19M rows of transactions.
+> * I already have a function `aggregate_sales_data(...)` that returns an aggregated **daily** Polars DataFrame with at least these columns:
+>
+>   * `date` (daily, no time)
+>   * `product_id`
+>   * `store_id` (can be aggregated across stores if needed)
+>   * `sales` (mean or total per day, depending on config)
+>   * `price` (mean daily price)
+>   * `total_amount` (sales * price)
+> * For plotting, I will give you a **pre-aggregated** Polars DataFrame called `df_agg` (not lazy), which is the output of `aggregate_sales_data`. You do **not** need to call the aggregation function; just assume `df_agg` is ready.
+>
+> **Your job**
+>
+> * Generate Python code (only code, no extra text) that I can run directly in a Jupyter notebook.
+> * Use:
+>
+>   * `polars` for any extra data manipulation
+>   * **Plotly** (`plotly.express` and/or `plotly.graph_objects`) for visualizations
+>   * You may also use `numpy` and `pandas` for small helper conversions if needed.
+> * Assume `df_agg` is a Polars DataFrame and convert to pandas only when strictly necessary for Plotly.
+>
+> **Target visualizations**
+> Help me visually compare:
+>
+> * **Product aggregated across all stores vs per-store behavior**, to judge if I really need one model per product–store.
+>
+> We will build the following plots, **one at a time**, in this order:
+>
+> 1. **Line plot of sales and price over time**
+>
+>    * For a single `product_id` that I will specify.
+>    * Include:
+>
+>      * A trace for the product aggregated across all stores.
+>      * Optional: traces for individual stores (as separate lines) so I can toggle them on/off using the legend.
+>    * Show `sales` and `price` as separate y-axes or clearly distinguishable traces.
+> 2. **Histogram (or distribution plot) of daily sales**
+>
+>    * For the same product and either aggregated or per-store (we can decide at the time).
+>    * Helps see the distribution and volatility.
+> 3. **Seasonality plots**
+>
+>    * Sales by **day of week** (bar chart).
+>    * Sales by **month of year** (bar or box plot).
+>    * These should help detect weekly and yearly patterns and compare aggregate vs per-store.
+> 4. **Price vs. sales scatter plot**
+>
+>    * For the same product.
+>    * Points can be colored by store or by time (e.g., year/month) to see price elasticity and store differences.
+> 5. **Sparsity / zero-sales visualization**
+>
+>    * For the same product (aggregate and/or per-store).
+>    * For example:
+>
+>      * A time-series plot of sales with zeros clearly visible, or
+>      * A heatmap or dot plot where each day is marked as zero vs non-zero.
+>    * The goal is to see how intermittent demand is.
+>
+> **Interaction rules**
+>
+> * **Only produce code for ONE plot per response.**
+>
+>   * Start with plot 1 (line plot of sales and price).
+>   * After I run and review it, I will say something like “next plot” or “continue”, and only then should you generate the code for the next plot in the list.
+> * Each time:
+>
+>   * Assume `df_agg` is already defined in the notebook.
+>   * If you need a specific `product_id`, store filter, or aggregation level and I haven’t specified it, make a *reasonable default assumption* (e.g., pick one product ID via `.unique()` and comment clearly in the code where I should change it).
+> * Write clean, readable code with:
+>
+>   * Imports at the top (only once in the first response).
+>   * Comments explaining key steps (filtering, aggregation, etc.).
+>   * A single `fig.show()` call at the end of each plot block.
+>
+> Start now by generating **only the code for Plot 1 (line plot of sales and price over time)** as described above, following all the rules.
+
+```
+
+
+
+
+
+
+
+
+
+
+
 Nice, let’s turn the profiling plan into something concrete and code-y. I’ll propose:
 
 1. **What we’re going to compute** (profiling metrics)
